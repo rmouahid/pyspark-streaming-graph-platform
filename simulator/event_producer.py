@@ -5,6 +5,7 @@ import json
 import os
 import random
 import time
+import uuid
 from datetime import datetime, timezone
 
 from faker import Faker
@@ -34,7 +35,8 @@ def generate_event() -> dict:
     category = random.choice(CATEGORIES)
     low, high = PRICE_RANGES[category]
     return {
-        "timestamp":   datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f"),
+        # Décalage explicite (+00:00) : sans lui, Spark lirait l'heure dans le fuseau local.
+        "timestamp":   datetime.now(timezone.utc).isoformat(timespec="microseconds"),
         "user_id":     f"usr_{random.randint(1000, 9999)}",
         "user_city":   fake.city(),
         "product_id":  f"prod_{random.randint(1000, 9999)}",
@@ -45,14 +47,24 @@ def generate_event() -> dict:
     }
 
 
+def write_event(event: dict, output_dir: str = DATA_PATH) -> str:
+    # Écriture atomique : le JSON est d'abord écrit dans un fichier caché, que Spark
+    # et le dashboard ignorent, puis renommé. Sans cela, Spark peut lire un fichier
+    # à moitié écrit et produire une ligne entièrement nulle.
+    name = f"event_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.json"
+    tmp_path = os.path.join(output_dir, f".{name}.tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(event, f, ensure_ascii=False)
+    path = os.path.join(output_dir, name)
+    os.replace(tmp_path, path)
+    return path
+
+
 def run(output_dir: str = DATA_PATH, delay: float = 0.5) -> None:
     os.makedirs(output_dir, exist_ok=True)
     print(f"Simulateur démarré → {output_dir}  (délai {delay}s)")
     while True:
-        event = generate_event()
-        filename = os.path.join(output_dir, f"event_{int(time.time() * 1000)}.json")
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(event, f, ensure_ascii=False)
+        write_event(generate_event(), output_dir)
         time.sleep(delay)
 
 
