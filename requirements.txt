@@ -13,3 +13,6 @@ faker>=24.0.0
 # Dashboard
 streamlit>=1.32.0
 pyvis>=0.3.2
+
+# Tests
+pytest>=8.0.0
