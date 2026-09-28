@@ -62,10 +62,14 @@ def _write_csv(df: DataFrame, path: str) -> None:
     # pour écrire un fichier unique directement lisible par le dashboard.
     rows = df.collect()
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    # Écriture dans un fichier temporaire puis renommage atomique : le dashboard,
+    # qui relit ces fichiers toutes les 5 s, ne voit jamais un CSV à moitié écrit.
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=df.columns)
         writer.writeheader()
         writer.writerows([row.asDict() for row in rows])
+    os.replace(tmp_path, path)
 
 
 def compute_metrics(graph: GraphFrame) -> None:
