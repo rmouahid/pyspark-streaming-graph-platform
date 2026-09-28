@@ -21,6 +21,8 @@ def read_stream(spark: SparkSession, path: str = DATA_PATH) -> DataFrame:
         .schema(EVENT_SCHEMA)
         # Limite les fichiers traités par déclenchement pour éviter une surcharge au démarrage.
         .option("maxFilesPerTrigger", 10)
+        # Un JSON invalide ou mal typé est ignoré au lieu de produire une ligne de nulls.
+        .option("mode", "DROPMALFORMED")
         .json(path)
     )
 
@@ -40,10 +42,16 @@ def build_action_window_agg(stream_df: DataFrame) -> DataFrame:
 
 
 def _process_batch(batch_df: DataFrame, epoch_id: int) -> None:
-    # On ignore les micro-batches vides pour ne pas écrire un graphe vide.
-    if batch_df.count() == 0:
-        return
-    compute_metrics(build_graph(batch_df))
+    # Le batch est lu trois fois (test de vacuité, sommets, arêtes) : on le garde en
+    # mémoire plutôt que de relire les fichiers JSON à chaque fois.
+    batch_df.persist()
+    try:
+        # On ignore les micro-batches vides pour ne pas écrire un graphe vide.
+        if batch_df.isEmpty():
+            return
+        compute_metrics(build_graph(batch_df))
+    finally:
+        batch_df.unpersist()
 
 
 def start_queries(spark: SparkSession, stream_df: DataFrame):
