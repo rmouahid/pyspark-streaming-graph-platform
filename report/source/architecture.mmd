@@ -1,0 +1,16 @@
+flowchart TB
+    SIM["<b>Simulateur</b><br/>event_producer.py<br/>1 événement JSON / 500 ms"]
+    FS[("data/events/*.json<br/>écriture atomique")]
+    subgraph SPARK["Spark Structured Streaming · streaming.py"]
+        RS["readStream.json<br/>schéma strict · DROPMALFORMED<br/>maxFilesPerTrigger = 10"]
+        Q1["<b>q1</b> · fenêtre glissante 1 min / 30 s<br/>watermark 10 s · mode update"]
+        Q2["<b>q2</b> · foreachBatch<br/>GraphFrames"]
+        MEM[("table mémoire<br/>action_counts")]
+        RS --> Q1 --> MEM
+        RS --> Q2
+    end
+    CSV[("data/graph_vertices.csv<br/>data/graph_edges.csv")]
+    DASH["<b>Dashboard Streamlit</b><br/>PyVis · rafraîchi toutes les 5 s"]
+    SIM --> FS --> RS
+    Q2 --> CSV --> DASH
+    FS -. "100 derniers événements" .-> DASH

@@ -49,7 +49,7 @@ pyspark-streaming-graph-platform/
 │
 ├── tests/                        # Tests pytest (simulateur, pipeline, graphe)
 │
-└── report/                       # Dépôt du rapport
+└── report/                       # Rapport technique (PDF) et ses sources
 ```
 
 ---

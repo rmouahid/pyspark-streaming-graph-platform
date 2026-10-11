@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Rapport technique — PySpark Streaming Graph Platform</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm 22mm 20mm; }
+  body { font-family: "DejaVu Serif", Georgia, serif; font-size: 10.5pt; line-height: 1.5; color: #1d1d1f; }
+  h1, h2, h3 { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; color: #1a3b5c; }
+  h1 { font-size: 24pt; margin: 0 0 6mm; line-height: 1.2; }
+  h2 { font-size: 15pt; margin: 9mm 0 3mm; border-bottom: 1.5px solid #1a3b5c; padding-bottom: 1.5mm; break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 5mm 0 2mm; break-after: avoid; }
+  p { margin: 0 0 2.6mm; text-align: justify; }
+  code { font-family: "DejaVu Sans Mono", Menlo, monospace; font-size: 8.8pt; background: #f2f4f7; padding: 0 2px; border-radius: 2px; }
+  pre { font-family: "DejaVu Sans Mono", Menlo, monospace; font-size: 8pt; line-height: 1.35; background: #f5f7fa; border: 1px solid #dde3ea; border-radius: 3px; padding: 3mm; white-space: pre; overflow: hidden; break-inside: avoid; margin: 2mm 0 3mm; }
+  pre.console { background: #14181f; color: #d8dee9; border-color: #14181f; }
+  table { border-collapse: collapse; width: 100%; margin: 2mm 0 4mm; font-size: 9.3pt; break-inside: avoid; }
+  th, td { border: 1px solid #cfd6de; padding: 1.4mm 2mm; text-align: left; vertical-align: top; }
+  td code { overflow-wrap: anywhere; }
+  th { background: #eaf0f6; font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; }
+  figure { margin: 4mm 0; text-align: center; break-inside: avoid; }
+  figure img { max-width: 100%; border: 1px solid #dde3ea; }
+  figcaption { font-size: 9pt; color: #555; margin-top: 1.5mm; font-style: italic; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1mm; }
+  .cover { height: 245mm; display: flex; flex-direction: column; justify-content: center; break-after: page; }
+  .cover .sub { font-size: 13pt; color: #444; margin-bottom: 18mm; font-family: "DejaVu Sans", Helvetica, sans-serif; }
+  .cover .meta { font-size: 11pt; line-height: 1.8; font-family: "DejaVu Sans", Helvetica, sans-serif; }
+  .cover .bar { width: 40mm; height: 3px; background: #1a3b5c; margin-bottom: 8mm; }
+  .toc { break-after: page; }
+  .toc ol { font-family: "DejaVu Sans", Helvetica, sans-serif; line-height: 1.9; }
+  .note { border-left: 3px solid #1a3b5c; background: #f2f6fa; padding: 2mm 3mm; margin: 3mm 0; break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="bar"></div>
+  <h1>PySpark Streaming Graph Platform</h1>
+  <div class="sub">Rapport technique — traitement de flux en temps réel et graphe dynamique avec Spark Structured Streaming et GraphFrames</div>
+  <div class="meta">
+    Rayân MOUAHID · Ayman HAFID<br>
+    Dépôt : github.com/rmouahid/pyspark-streaming-graph-platform<br>
+    Octobre 2026
+  </div>
+</section>
+
+<section class="toc">
+  <h2>Sommaire</h2>
+  <ol>
+    <li>Introduction</li>
+    <li>Architecture globale</li>
+    <li>Simulateur et schéma d'événements</li>
+    <li>Configuration de la SparkSession</li>
+    <li>Schéma strict et lecture en streaming</li>
+    <li>Fenêtrage, watermark et mode de sortie</li>
+    <li>Modèle de graphe</li>
+    <li>Dashboard</li>
+    <li>Tests et validation</li>
+    <li>Conclusion</li>
+  </ol>
+</section>
+
+<h2>1. Introduction</h2>
+
+<h3>Contexte</h3>
+<p>Une place de marché en ligne produit en continu des interactions entre utilisateurs, produits et vendeurs : consultations, mentions « j'aime », achats. Ces données n'ont de valeur que si elles sont analysées pendant qu'elles arrivent, pour suivre l'activité en temps réel et comprendre la structure des relations entre acteurs. Ce projet construit une plateforme complète qui simule ce flux, le traite avec Spark Structured Streaming et le représente sous forme de graphe dynamique.</p>
+
+<h3>Objectifs</h3>
+<ul>
+  <li>Simuler un flux réaliste d'événements de place de marché.</li>
+  <li>Le consommer en streaming avec un schéma strict, en agrégeant l'activité par fenêtres temporelles bornées par un watermark.</li>
+  <li>Construire à chaque micro-batch un graphe GraphFrames (utilisateurs, produits, vendeurs) et l'exporter.</li>
+  <li>Visualiser le graphe et l'activité dans un dashboard rafraîchi automatiquement.</li>
+  <li>Couvrir l'ensemble par des tests automatisés exécutés sur une vraie SparkSession.</li>
+</ul>
+
+<h3>Stack technique</h3>
+<table>
+  <tr><th>Composant</th><th>Technologie</th><th>Rôle</th></tr>
+  <tr><td>Moteur de traitement</td><td>PySpark 3.5.1, Structured Streaming</td><td>Lecture du flux, fenêtrage, watermark, micro-batches</td></tr>
+  <tr><td>Graphe</td><td>GraphFrames 0.8.3 (Spark 3.5, Scala 2.12)</td><td>Sommets et arêtes typés à partir de DataFrames</td></tr>
+  <tr><td>Simulation</td><td>Python, Faker (<code>fr_FR</code>)</td><td>Génération des événements</td></tr>
+  <tr><td>Dashboard</td><td>Streamlit, PyVis, pandas</td><td>Visualisation rafraîchie toutes les 5 s</td></tr>
+  <tr><td>Tests</td><td>pytest</td><td>25 tests sur une SparkSession locale réelle</td></tr>
+</table>
+
+<h2>2. Architecture globale</h2>
+<p>La plateforme se compose de trois processus indépendants qui communiquent par le système de fichiers : un simulateur qui produit des fichiers JSON, une pipeline Spark qui les consomme et un dashboard qui lit les résultats. Le script <code>run.sh</code> les lance ensemble, avec un journal par composant.</p>
+
+<figure>
+  <img src="fig/architecture.png" alt="Architecture de la plateforme" style="max-height:150mm">
+  <figcaption>Figure 1 — Architecture : Simulateur → Spark Structured Streaming (q1 et q2) → GraphFrames → Dashboard.</figcaption>
+</figure>
+
+<p>La pipeline démarre deux requêtes de streaming sur la même source :</p>
+<ul>
+  <li><b>q1</b> agrège le nombre d'événements par type d'action sur une fenêtre glissante. Elle illustre le fenêtrage, le watermark et le mode de sortie <code>update</code>, et écrit dans une table en mémoire (<code>action_counts</code>).</li>
+  <li><b>q2</b> traite chaque micro-batch avec <code>foreachBatch</code> : elle construit un <code>GraphFrame</code> et exporte ses sommets et ses arêtes en CSV pour le dashboard.</li>
+</ul>
+<p>Le choix d'un échange par fichiers, plutôt que par un broker comme Kafka, garde la plateforme exécutable sur un poste seul, sans infrastructure. La source fichier de Spark offre les mêmes garanties de reprise grâce aux checkpoints.</p>
+
+<h2>3. Simulateur et schéma d'événements</h2>
+
+<h3>Schéma d'un événement</h3>
+<table>
+  <tr><th>Champ</th><th>Type</th><th>Exemple</th></tr>
+  <tr><td><code>timestamp</code></td><td>Timestamp (UTC)</td><td><code>2026-10-11T08:59:32.593000+00:00</code></td></tr>
+  <tr><td><code>user_id</code></td><td>String</td><td><code>usr_9482</code></td></tr>
+  <tr><td><code>user_city</code></td><td>String</td><td><code>Paris</code></td></tr>
+  <tr><td><code>product_id</code></td><td>String</td><td><code>prod_5501</code></td></tr>
+  <tr><td><code>product_cat</code></td><td>String</td><td><code>Électronique</code></td></tr>
+  <tr><td><code>seller_id</code></td><td>String</td><td><code>sel_214</code></td></tr>
+  <tr><td><code>action_type</code></td><td>String</td><td><code>VUES</code>, <code>AIME</code> ou <code>ACHAT</code></td></tr>
+  <tr><td><code>price</code></td><td>Double</td><td><code>450.0</code></td></tr>
+</table>
+
+<h3>Logique du simulateur</h3>
+<p><code>simulator/event_producer.py</code> produit un événement toutes les 500 ms, soit 2 événements par seconde. Plusieurs choix le rendent réaliste et robuste :</p>
+<ul>
+  <li><b>Répartition pondérée des actions</b> : 70 % de vues, 20 % de « j'aime », 10 % d'achats, à l'image d'un entonnoir de conversion.</li>
+  <li><b>Prix cohérents avec la catégorie</b> : chaque catégorie (véhicules, immobilier, électronique, mode, maison, loisirs, animaux) a sa propre plage de prix.</li>
+  <li><b>Identifiants à cardinalité bornée</b> (<code>usr_1000</code> à <code>usr_9999</code>, <code>sel_100</code> à <code>sel_999</code>), pour que des nœuds se répètent et que le graphe ait des connexions.</li>
+  <li><b>Horodatage UTC explicite</b> (<code>+00:00</code>) : sans décalage, Spark interpréterait l'heure dans le fuseau de la machine, ce qui fausserait les fenêtres.</li>
+  <li><b>Écriture atomique</b> : l'événement est écrit dans un fichier caché (<code>.event_….json.tmp</code>), puis renommé. Spark et le dashboard ignorent les fichiers cachés et ne lisent donc jamais un JSON à moitié écrit. Ce point a corrigé un défaut réel, des lignes entièrement nulles apparaissant dans le flux.</li>
+</ul>
+
+<h2>4. Configuration de la SparkSession</h2>
+<p>La session est créée dans <code>pipeline/spark_session.py</code>. Chaque paramètre répond à un besoin précis :</p>
+<table style="table-layout:fixed">
+  <colgroup><col style="width:30%"><col style="width:22%"><col style="width:48%"></colgroup>
+  <tr><th>Paramètre</th><th>Valeur</th><th>Justification</th></tr>
+  <tr><td><code>spark.jars.packages</code></td><td><code>graphframes:graphframes:<wbr>0.8.3-spark3.5-s_2.12</code></td><td>GraphFrames n'est pas inclus dans Spark ; le JAR correspondant à Spark 3.5 et Scala 2.12 est téléchargé depuis Maven au premier démarrage.</td></tr>
+  <tr><td><code>spark.sql.shuffle.<wbr>partitions</code></td><td><code>4</code></td><td>La valeur par défaut (200) crée 200 tâches par agrégation, pour une dizaine de lignes par micro-batch en local. 4 partitions suffisent et réduisent la latence de chaque déclenchement.</td></tr>
+  <tr><td><code>spark.sql.streaming.<wbr>schemaInference</code></td><td><code>false</code></td><td>Le schéma est déclaré explicitement (section 5) ; l'inférence est désactivée pour qu'aucun type ne soit deviné.</td></tr>
+  <tr><td><code>spark.sql.session.<wbr>timeZone</code></td><td><code>UTC</code></td><td>Le simulateur horodate en UTC : les fenêtres sont calculées en UTC quel que soit le fuseau de la machine.</td></tr>
+  <tr><td><code>spark.ui.<wbr>showConsoleProgress</code></td><td><code>false</code></td><td>Supprime la barre de progression qui noyait les journaux de la pipeline.</td></tr>
+  <tr><td><code>PYSPARK_PYTHON</code> (variable d'environnement)</td><td>interpréteur courant</td><td>Les workers Python doivent utiliser le même interpréteur que le driver. Sinon PySpark prend le <code>python3</code> du système et échoue (<code>PYTHON_VERSION_MISMATCH</code>) si le virtualenv n'est pas activé.</td></tr>
+  <tr><td><code>spark.executor.memory</code></td><td><code>2g</code></td><td>Prévu pour un déploiement en cluster. En mode local, l'exécuteur tourne dans la JVM du driver et ce réglage est sans effet ; la mémoire du driver (1 Go par défaut) a suffi à nos essais.</td></tr>
+</table>
+
+<h2>5. Schéma strict et lecture en streaming</h2>
+<p>Le schéma est déclaré dans <code>pipeline/schema.py</code> sous forme de <code>StructType</code>, champ par champ, avec des types précis (<code>TimestampType</code>, <code>DoubleType</code>, <code>StringType</code>).</p>
+<p>En Structured Streaming, le schéma d'une source fichier doit être connu avant le démarrage de la requête : il fixe le plan d'exécution pour toute la durée du stream. L'inférence lirait les premiers fichiers pour deviner les types. Elle pourrait alors classer le prix en entier si les premiers prix étaient ronds, ou le timestamp en chaîne, et le plan resterait figé avec ce mauvais type. Un schéma explicite garantit des types corrects dès le premier fichier. Il sert aussi de contrat entre le simulateur et la pipeline : un test vérifie que chaque événement produit le respecte.</p>
+<p>La lecture (<code>read_stream</code>) ajoute deux options :</p>
+<ul>
+  <li><code>mode = DROPMALFORMED</code> : un JSON invalide ou mal typé est écarté au lieu de produire une ligne de valeurs nulles qui fausserait les comptages.</li>
+  <li><code>maxFilesPerTrigger = 10</code> : chaque micro-batch lit au plus 10 fichiers. Au redémarrage après une interruption, l'arriéré est absorbé progressivement au lieu d'un premier batch démesuré. Avec un déclenchement toutes les 5 s et 2 événements/s, le débit de lecture correspond exactement au débit de production.</li>
+</ul>
+
+<h2>6. Fenêtrage, watermark et mode de sortie</h2>
+
+<h3>Fenêtre glissante plutôt que fixe</h3>
+<p>La requête q1 compte les événements par type d'action sur une fenêtre de <b>1 minute qui avance toutes les 30 secondes</b> (<code>window(timestamp, "1 minute", "30 seconds")</code>).</p>
+<ul>
+  <li>Une fenêtre <b>fixe</b> (tumbling) de 1 minute découpe le temps en tranches disjointes : chaque événement appartient à une seule fenêtre, et l'indicateur n'est actualisé qu'une fois par minute.</li>
+  <li>Une fenêtre <b>glissante</b> se chevauche avec ses voisines : chaque événement compte dans deux fenêtres, et une nouvelle mesure « sur la dernière minute » est disponible toutes les 30 secondes.</li>
+</ul>
+<p>Pour un suivi d'activité, la fenêtre glissante donne une courbe plus lisse et plus réactive, au prix d'un état deux fois plus grand.</p>
+
+<h3>Watermark</h3>
+<p>Le watermark de 10 secondes (<code>withWatermark("timestamp", "10 seconds")</code>) indique à Spark jusqu'où il doit attendre les événements en retard : un événement plus vieux que l'horodatage maximal déjà vu moins 10 secondes est ignoré. Il a deux effets :</p>
+<ul>
+  <li>il <b>borne l'état</b> : une fenêtre dont la fin est antérieure au watermark ne peut plus évoluer, et Spark la retire de son state store ;</li>
+  <li>il <b>tolère un retard raisonnable</b> : les fichiers arrivent en moins d'une seconde, et 10 secondes laissent une large marge sans retenir l'état trop longtemps.</li>
+</ul>
+<p>Le watermark doit être déclaré avant le <code>groupBy</code> pour que Spark l'applique à l'agrégation.</p>
+
+<h3>Mode de sortie <code>update</code></h3>
+<table>
+  <tr><th>Mode</th><th>Ce qu'il émet</th><th>Pourquoi nous ne l'avons pas retenu / retenu</th></tr>
+  <tr><td><code>append</code></td><td>Une fenêtre une seule fois, quand le watermark a dépassé sa fin</td><td>Résultat définitif mais tardif : au moins 1 min + 10 s après le début de la fenêtre. Trop lent pour un suivi en temps réel.</td></tr>
+  <tr><td><code>complete</code></td><td>Toute la table de résultats à chaque déclenchement</td><td>Toutes les fenêtres depuis le démarrage sont conservées et réémises : volume croissant sans fin.</td></tr>
+  <tr><td><b><code>update</code></b></td><td>Les seules lignes modifiées depuis le déclenchement précédent</td><td><b>Retenu</b> : chaque fenêtre en cours est mise à jour toutes les 5 s, et l'état reste borné par le watermark.</td></tr>
+</table>
+
+<h3>Observations sur une exécution réelle</h3>
+<p>Nous avons exécuté la plateforme complète pendant plus de trois minutes. Plus de 500 événements ont été produits. La table <code>action_counts</code> a été lue toutes les 30 secondes et la progression des requêtes relevée à la fin. Extrait de la table, fenêtres les plus récentes en premier :</p>
+<pre class="console">+-------------------+-------------------+-----------+-----------+
+|debut              |fin                |action_type|event_count|
++-------------------+-------------------+-----------+-----------+
+|2026-10-11 08:59:30|2026-10-11 09:00:30|ACHAT      |2          |
+|2026-10-11 08:59:30|2026-10-11 09:00:30|AIME       |2          |
+|2026-10-11 08:59:30|2026-10-11 09:00:30|VUES       |6          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|ACHAT      |4          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|ACHAT      |1          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|ACHAT      |8          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|ACHAT      |3          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|ACHAT      |5          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|ACHAT      |6          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|ACHAT      |2          |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|AIME       |15         |
+|2026-10-11 08:59:00|2026-10-11 09:00:00|AIME       |9          |
++-------------------+-------------------+-----------+-----------+</pre>
+<p>Cette sortie illustre directement le mode <code>update</code>. Les fenêtres se chevauchent de 30 s, et la même fenêtre apparaît plusieurs fois avec des comptes croissants (ACHAT : 1, 2, 3… 8) : chaque déclenchement réémet la ligne modifiée, et le sink <code>memory</code> <b>ajoute</b> ces mises à jour au lieu de les remplacer. Pour connaître la valeur courante d'une fenêtre, il faut donc garder le compte maximal par couple (fenêtre, action). Un sink transactionnel, comme une table Delta avec <code>MERGE</code>, ferait cette mise à jour en place.</p>
+<p>Progression de q1 au dernier déclenchement (<code>lastProgress</code>, extrait) :</p>
+<pre class="console">"batchId": 42,  "numInputRows": 10,
+"inputRowsPerSecond": 1.9996,  "processedRowsPerSecond": 10.07,
+"eventTime": { "min": "08:59:30.340Z", "max": "08:59:34.845Z",
+               "watermark": "08:59:19.838Z" },
+"stateOperators": [{ "numRowsTotal": 9, "numRowsUpdated": 6,
+                     "numRowsRemoved": 0, "numRowsDroppedByWatermark": 0,
+                     "numShufflePartitions": 4, "memoryUsedBytes": 4272 }]</pre>
+<p>Ces mesures confirment les choix de configuration :</p>
+<ul>
+  <li>le débit d'entrée (2 lignes/s) correspond au simulateur, et chaque batch lit les 10 fichiers autorisés ;</li>
+  <li>le traitement est cinq fois plus rapide que l'arrivée des données (10 lignes/s traitées), donc la pipeline ne prend pas de retard ;</li>
+  <li><b>l'état reste borné à 9 lignes</b> (3 fenêtres ouvertes × 3 types d'action) grâce au watermark, environ 10 s derrière l'événement le plus récent du batch précédent ;</li>
+  <li>aucun événement n'a été écarté comme trop tardif ;</li>
+  <li>4 partitions de shuffle, comme configuré.</li>
+</ul>
+<p>Côté graphe, q2 traite un micro-batch de 10 événements en 1,1 s (<code>triggerExecution</code> : 1 120 ms), dont 870 ms pour la construction du graphe et l'export CSV.</p>
+
+<h2>7. Modèle de graphe</h2>
+<p><code>pipeline/graph.py</code> construit un graphe orienté à partir de chaque micro-batch.</p>
+
+<h3>Sommets</h3>
+<table>
+  <tr><th>Type</th><th>Identifiant</th><th>Libellé</th><th>Couleur (dashboard)</th></tr>
+  <tr><td>User</td><td><code>user_id</code></td><td>ville de l'utilisateur</td><td>bleu</td></tr>
+  <tr><td>Product</td><td><code>product_id</code></td><td>catégorie du produit</td><td>orange</td></tr>
+  <tr><td>Seller</td><td><code>seller_id</code></td><td>identifiant du vendeur</td><td>vert</td></tr>
+</table>
+<p>Un même acteur peut apparaître dans plusieurs événements d'un batch : les sommets sont dédupliqués sur leur identifiant. Les valeurs nulles sont filtrées avant la construction.</p>
+
+<h3>Arêtes</h3>
+<table>
+  <tr><th>Source → destination</th><th>Relation</th><th>Origine</th></tr>
+  <tr><td>User → Product</td><td><code>VUES</code>, <code>AIME</code>, <code>ACHAT</code></td><td>une arête par interaction (une même paire peut en avoir plusieurs)</td></tr>
+  <tr><td>Seller → Product</td><td><code>PROPOSE</code></td><td>dédupliquée : un vendeur propose un produit une seule fois</td></tr>
+</table>
+
+<h3>Export et métriques</h3>
+<p>Les sommets et les arêtes sont écrits dans <code>data/graph_vertices.csv</code> et <code>data/graph_edges.csv</code>. <code>DataFrame.write.csv()</code> produirait un répertoire de fichiers <code>part-*</code> que le dashboard ne sait pas lire : le graphe d'un micro-batch étant petit, il est rassemblé sur le driver (<code>collect()</code>) et écrit en un seul fichier. L'écriture passe par un fichier temporaire puis un renommage atomique, pour que le dashboard ne lise jamais un CSV incomplet.</p>
+<p>Les métriques affichées sont la taille du graphe (nombre de nœuds et d'arêtes) et, côté dashboard, la répartition des actions et des achats par catégorie. La fonction <code>compute_metrics</code> se limite aujourd'hui à l'export : les métriques de graphe propres à GraphFrames (degrés, PageRank, composantes connexes) sont une évolution naturelle (section 10).</p>
+
+<h2>8. Dashboard</h2>
+<p>Le dashboard (<code>dashboard/app.py</code>) est une application Streamlit. Nous l'avons préférée à Dash ou à une page web sur mesure, car elle permet de construire une interface en Python pur, avec graphiques et mise en page en colonnes, en une centaine de lignes. Il présente :</p>
+<ul>
+  <li>le <b>graphe en temps réel</b>, rendu avec PyVis (vis.js) : nœuds colorés par type, arêtes orientées et étiquetées par la relation, survol pour le détail ;</li>
+  <li>une <b>légende</b> des types de nœuds ;</li>
+  <li>la <b>répartition des actions</b> sur les 100 derniers événements, en histogramme ;</li>
+  <li>les <b>achats par catégorie</b>.</li>
+</ul>
+<p>Le <b>rafraîchissement</b> est automatique toutes les 5 secondes (<code>DASHBOARD_REFRESH_MS</code>). Le script attend cet intervalle, puis relance son exécution (<code>st.rerun()</code>) et relit les fichiers. Cette fréquence correspond au déclenchement des requêtes Spark (5 s) : un rafraîchissement plus rapide n'afficherait rien de nouveau.</p>
+
+<figure>
+  <img src="fig/dashboard.png" alt="Dashboard Streamlit">
+  <figcaption>Figure 2 — Dashboard pendant l'exécution réelle : graphe du dernier micro-batch (30 nœuds, 20 arêtes) et répartition des actions, conforme à la pondération 70/20/10.</figcaption>
+</figure>
+
+<p>La capture montre des composantes en étoile autour des produits (un vendeur, un ou plusieurs utilisateurs). C'est attendu : avec 10 événements par batch et des identifiants tirés parmi plusieurs milliers, deux événements d'un même batch partagent rarement un utilisateur ou un produit.</p>
+
+<h2>9. Tests et validation</h2>
+<p>La suite pytest compte <b>25 tests</b>, exécutés sur une vraie SparkSession locale, et non sur des simulacres. Les comportements testés sont donc ceux de Spark lui-même.</p>
+<table>
+  <tr><th>Fichier</th><th>Ce qui est vérifié</th></tr>
+  <tr><td><code>test_simulator.py</code></td><td>conformité des événements au schéma, cohérence catégorie/prix, répartition des actions, écriture atomique</td></tr>
+  <tr><td><code>test_pipeline.py</code></td><td>fenêtres glissantes et comptages, schéma du stream, lecture en UTC, JSON malformés ignorés, traitement d'un micro-batch</td></tr>
+  <tr><td><code>test_graph.py</code></td><td>sommets, arêtes, déduplication, valeurs nulles, construction du <code>GraphFrame</code>, export CSV</td></tr>
+</table>
+<p>Résultat : <code>25 passed</code> (Python 3.12, PySpark 3.5.1). S'y ajoute l'exécution de bout en bout décrite en section 6.</p>
+
+<h2>10. Conclusion</h2>
+
+<h3>Difficultés rencontrées</h3>
+<ul>
+  <li><b>Compatibilité de l'environnement</b> : PySpark 3.5 et Python 3.12 (suppression de <code>distutils</code>, versions d'Arrow) ont demandé d'ajuster les dépendances. Les workers lancés avec le mauvais interpréteur provoquaient une erreur de version, résolue en fixant <code>PYSPARK_PYTHON</code>.</li>
+  <li><b>Fichiers lus pendant leur écriture</b> : Spark et le dashboard lisaient parfois un JSON ou un CSV incomplet, d'où des lignes nulles ou des erreurs de lecture. L'écriture atomique (fichier caché puis renommage) a supprimé le problème des deux côtés.</li>
+  <li><b>Fuseaux horaires</b> : des horodatages sans décalage étaient lus dans le fuseau de la machine, ce qui décalait les fenêtres. L'UTC explicite côté simulateur et côté session règle la question.</li>
+  <li><b>Travail en équipe</b> : la fusion des branches a demandé de résoudre des conflits sur la pipeline et le graphe, développés en parallèle.</li>
+</ul>
+
+<h3>Points d'amélioration</h3>
+<ul>
+  <li><b>Graphe cumulatif</b> : le graphe représente aujourd'hui le seul dernier micro-batch. Fusionner les sommets et arêtes dans un état persistant, ou sur une fenêtre de quelques minutes, ferait apparaître les vrais hubs (vendeurs et produits populaires).</li>
+  <li><b>Métriques de graphe</b> : exploiter GraphFrames au-delà de la construction, avec degrés entrants et sortants, PageRank des produits et composantes connexes.</li>
+  <li><b>Sink des agrégats</b> : lire la valeur courante des fenêtres dans le dashboard (dernier compte par fenêtre et action), ou écrire dans un sink transactionnel au lieu de la table mémoire.</li>
+  <li><b>Source de production</b> : remplacer l'échange par fichiers par Kafka, pour la montée en charge et le découplage des producteurs.</li>
+  <li><b>Exploitation</b> : purger les fichiers d'événements déjà traités et dimensionner la mémoire du driver, réglage effectif en local, plutôt que celle de l'exécuteur.</li>
+</ul>
+
+<h3>Apports du projet</h3>
+<p>Ce projet nous a fait manipuler concrètement les notions centrales du traitement de flux :</p>
+<ul>
+  <li>le contrat de schéma ;</li>
+  <li>la différence entre temps de l'événement et temps de traitement ;</li>
+  <li>le rôle du watermark dans la maîtrise de l'état ;</li>
+  <li>les compromis entre modes de sortie.</li>
+</ul>
+<p>L'exécution réelle a confirmé les choix de configuration par des mesures, notamment un état borné à 9 lignes et un traitement plus rapide que l'arrivée des données. Elle a aussi montré des comportements qu'on ne voit pas sur le papier, comme l'accumulation des mises à jour dans un sink mémoire. La combinaison de Spark, GraphFrames et Streamlit montre enfin qu'une chaîne complète, de la donnée brute au graphe interactif, peut rester simple et exécutable sur un seul poste.</p>
+
+</body>
+</html>
