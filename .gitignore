@@ -10,6 +10,8 @@ build/
 .env
 .venv/
 env/
+.pytest_cache/
+.ruff_cache/
 
 # Spark
 spark-warehouse/
