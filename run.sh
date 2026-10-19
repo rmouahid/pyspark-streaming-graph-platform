@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 ###
 ### Ce fichier a été fait par l'IA, il sert uniquement à lancer la plateforme complète (simulateur, pipeline Spark, dashboard) en une seule commande.
 ###
 
-#!/usr/bin/env bash
 set -euo pipefail
 
 # ── Paths ────────────────────────────────────────────────────────────────────
