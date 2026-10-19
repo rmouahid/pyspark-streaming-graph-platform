@@ -101,6 +101,20 @@ event_producer  →  data/events/*.json  →  streaming.py (Spark)
 
 ---
 
+## Installation
+
+```bash
+git clone https://github.com/rmouahid/pyspark-streaming-graph-platform.git
+cd pyspark-streaming-graph-platform
+python3.12 -m venv .venv          # Python 3.10 à 3.12
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+`./run.sh` fait ces étapes automatiquement s'il ne trouve pas de virtualenv.
+
+---
+
 ## Lancement
 
 ```bash
@@ -131,6 +145,7 @@ Dashboard accessible sur : [http://localhost:8501](http://localhost:8501)
 ```bash
 pip install -r requirements.txt
 pytest tests/
+ruff check .                      # style PEP 8 et ordre des imports (ruff.toml)
 ```
 
 Les tests tournent sur une SparkSession locale réelle (Java 11+ et accès à Maven au premier lancement pour le JAR GraphFrames) :
