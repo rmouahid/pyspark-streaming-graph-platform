@@ -1,8 +1,8 @@
 import csv
 
+from conftest import event
 from graphframes import GraphFrame
 
-from conftest import event
 from pipeline import graph as graph_module
 from pipeline.graph import build_edges, build_graph, build_vertices, compute_metrics
 

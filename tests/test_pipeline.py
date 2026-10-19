@@ -1,6 +1,7 @@
 import json
 
 from conftest import event
+
 from pipeline.schema import EVENT_SCHEMA
 from pipeline.streaming import build_action_window_agg, read_stream
 

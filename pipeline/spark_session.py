@@ -4,7 +4,8 @@ import os
 import sys
 
 from pyspark.sql import SparkSession
-from config.settings import SPARK_APP_NAME, GRAPHFRAMES_JAR
+
+from config.settings import GRAPHFRAMES_JAR, SPARK_APP_NAME
 
 
 def get_spark_session(app_name: str = SPARK_APP_NAME) -> SparkSession:
