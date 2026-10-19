@@ -1,7 +1,9 @@
 # Pipeline Spark Structured Streaming : lecture du stream JSON, agrégation par fenêtre glissante
 # et construction du graphe GraphFrames à chaque micro-batch.
 
-from pyspark.sql import SparkSession, DataFrame
+import logging
+
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, count, window
 
 from config.settings import (
@@ -13,6 +15,8 @@ from config.settings import (
 )
 from pipeline.graph import build_graph, compute_metrics
 from pipeline.schema import EVENT_SCHEMA
+
+logger = logging.getLogger(__name__)
 
 
 def read_stream(spark: SparkSession, path: str = DATA_PATH) -> DataFrame:
@@ -80,11 +84,12 @@ def start_queries(spark: SparkSession, stream_df: DataFrame):
 if __name__ == "__main__":
     from pipeline.spark_session import get_spark_session
 
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     spark = get_spark_session()
     spark.sparkContext.setLogLevel("ERROR")
 
     stream_df = read_stream(spark)
     start_queries(spark, stream_df)
 
-    print("Pipeline démarrée. Ctrl+C pour arrêter.")
+    logger.info("Pipeline démarrée. Ctrl+C pour arrêter.")
     spark.streams.awaitAnyTermination()

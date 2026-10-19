@@ -2,6 +2,7 @@
 # sous forme de fichiers JSON déposés dans data/events/ toutes les 500ms.
 
 import json
+import logging
 import os
 import random
 import time
@@ -11,6 +12,8 @@ from datetime import datetime, timezone
 from faker import Faker
 
 from config.settings import DATA_PATH
+
+logger = logging.getLogger(__name__)
 
 fake = Faker("fr_FR")
 
@@ -62,11 +65,12 @@ def write_event(event: dict, output_dir: str = DATA_PATH) -> str:
 
 def run(output_dir: str = DATA_PATH, delay: float = 0.5) -> None:
     os.makedirs(output_dir, exist_ok=True)
-    print(f"Simulateur démarré → {output_dir}  (délai {delay}s)")
+    logger.info("Simulateur démarré → %s (délai %ss)", output_dir, delay)
     while True:
         write_event(generate_event(), output_dir)
         time.sleep(delay)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     run()
