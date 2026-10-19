@@ -5,7 +5,14 @@ from datetime import datetime
 import pytest
 
 from pipeline.schema import EVENT_SCHEMA
-from simulator.event_producer import ACTIONS, CATEGORIES, PRICE_RANGES, WEIGHTS, generate_event, write_event
+from simulator.event_producer import (
+    ACTIONS,
+    CATEGORIES,
+    PRICE_RANGES,
+    WEIGHTS,
+    generate_event,
+    write_event,
+)
 
 
 @pytest.fixture
