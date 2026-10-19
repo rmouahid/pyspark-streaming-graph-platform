@@ -1,5 +1,7 @@
 # PySpark Streaming Graph Platform
 
+[![Tests](https://github.com/rmouahid/pyspark-streaming-graph-platform/actions/workflows/tests.yml/badge.svg?branch=dev)](https://github.com/rmouahid/pyspark-streaming-graph-platform/actions/workflows/tests.yml)
+
 Pipeline de streaming en temps réel simulant des interactions utilisateur/vendeur/produit sur une place de marché, traitées avec PySpark Structured Streaming et visualisées sous forme de graphe dynamique via GraphFrames.
 
 ---
