@@ -159,3 +159,7 @@ Les tests tournent sur une SparkSession locale réelle (Java 11+ et accès à Ma
 | `tests/test_graph.py` | sommets, arêtes, déduplication, valeurs nulles, `GraphFrame`, export CSV |
 
 PySpark 3.5 supporte Python 3.10 à 3.12. Les workers Spark utilisent automatiquement l'interpréteur qui lance le pipeline (`PYSPARK_PYTHON`), il n'est donc pas nécessaire d'activer le virtualenv.
+
+## Licence
+
+Ce projet est distribué sous licence MIT. Voir le fichier [LICENSE](LICENSE).
