@@ -30,7 +30,10 @@ jobs:
           key: ivy-${{ hashFiles('config/settings.py') }}
 
       - name: Installer les dépendances
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
+
+      - name: Vérifier le style et les imports
+        run: ruff check .
 
       - name: Lancer les tests
         run: pytest tests/
