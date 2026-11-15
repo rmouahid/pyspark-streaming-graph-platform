@@ -145,12 +145,12 @@ Dashboard accessible sur : [http://localhost:8501](http://localhost:8501)
 ## Tests
 
 ```bash
-pip install -r requirements.txt
-pytest tests/
+pip install -r requirements-dev.txt
 ruff check .                      # style PEP 8 et ordre des imports (ruff.toml)
+pytest tests/
 ```
 
-Les tests tournent sur une SparkSession locale réelle (Java 11+ et accès à Maven au premier lancement pour le JAR GraphFrames) :
+La CI exécute le même contrôle de style et les mêmes tests. Les tests tournent sur une SparkSession locale réelle (Java 11+ et accès à Maven au premier lancement pour le JAR GraphFrames) :
 
 | Fichier | Couverture |
 |---|---|
