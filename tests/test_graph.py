@@ -1,5 +1,8 @@
 import csv
+from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from conftest import event
 from graphframes import GraphFrame
 
@@ -84,3 +87,25 @@ def test_compute_metrics_writes_readable_csv_files(make_events, tmp_path, monkey
     with open(edges_path, encoding="utf-8") as f:
         assert {r["relationship"] for r in csv.DictReader(f)} == {"VUES", "PROPOSE"}
     assert sorted(p.name for p in tmp_path.iterdir()) == ["e.csv", "v.csv"]  # pas de fichier temporaire restant
+
+
+def test_write_csv_keeps_previous_export_if_replacement_fails(tmp_path, monkeypatch):
+    path = tmp_path / "graph.csv"
+    path.write_text("id\nold\n", encoding="utf-8")
+    row = SimpleNamespace(asDict=lambda: {"id": "new"})
+    df = SimpleNamespace(columns=["id"], collect=lambda: [row])
+
+    def fail_replace(source, destination):
+        temporary = Path(source)
+        assert temporary.parent == destination.parent
+        assert temporary.read_text(encoding="utf-8") == "id\nnew\n"
+        assert destination.read_text(encoding="utf-8") == "id\nold\n"
+        raise OSError("replacement failed")
+
+    monkeypatch.setattr(graph_module.os, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replacement failed"):
+        graph_module._write_csv(df, path)
+
+    assert path.read_text(encoding="utf-8") == "id\nold\n"
+    assert list(tmp_path.iterdir()) == [path]

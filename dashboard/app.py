@@ -15,16 +15,24 @@ from config.settings import (
     GRAPH_VERTICES_PATH,
 )
 
-st.set_page_config(page_title="Streaming Graph Dashboard", layout="wide")
-
 NODE_COLORS = {"User": "#4C9BE8", "Seller": "#5EBD7A", "Product": "#F4A442"}
 REFRESH_S   = DASHBOARD_REFRESH_MS / 1000
 
 
 def load_graph():
-    if not os.path.exists(GRAPH_VERTICES_PATH) or not os.path.exists(GRAPH_EDGES_PATH):
+    try:
+        vertices = pd.read_csv(GRAPH_VERTICES_PATH)
+        edges = pd.read_csv(GRAPH_EDGES_PATH)
+    except (OSError, UnicodeError, pd.errors.EmptyDataError, pd.errors.ParserError):
         return None, None
-    return pd.read_csv(GRAPH_VERTICES_PATH), pd.read_csv(GRAPH_EDGES_PATH)
+
+    if not {"id", "type", "label"}.issubset(vertices.columns):
+        return None, None
+    if not {"src", "dst", "relationship"}.issubset(edges.columns):
+        return None, None
+
+    node_ids = vertices["id"]
+    return vertices, edges[edges["src"].isin(node_ids) & edges["dst"].isin(node_ids)]
 
 
 def load_recent_events(n: int = 100) -> pd.DataFrame:
@@ -54,45 +62,49 @@ def build_pyvis(vertices: pd.DataFrame, edges: pd.DataFrame) -> str:
     return net.generate_html()
 
 
-# ── Layout ────────────────────────────────────────────────────────────────────
+def main():
+    st.set_page_config(page_title="Streaming Graph Dashboard", layout="wide")
+    st.title("Streaming Graph Platform")
 
-st.title("Streaming Graph Platform")
+    vertices, edges = load_graph()
+    events          = load_recent_events()
 
-vertices, edges = load_graph()
-events          = load_recent_events()
+    col_graph, col_metrics = st.columns([2, 1])
 
-col_graph, col_metrics = st.columns([2, 1])
+    with col_graph:
+        st.subheader("Graphe en temps réel")
+        if vertices is not None and not vertices.empty:
+            components.html(build_pyvis(vertices, edges), height=500)
+            st.caption(f"{len(vertices)} nœuds · {len(edges)} arêtes")
+        else:
+            st.info("En attente du pipeline… Lancez `./run.sh`")
 
-with col_graph:
-    st.subheader("Graphe en temps réel")
-    if vertices is not None and not vertices.empty:
-        components.html(build_pyvis(vertices, edges), height=500)
-        st.caption(f"{len(vertices)} nœuds · {len(edges)} arêtes")
-    else:
-        st.info("En attente du pipeline… Lancez `./run.sh`")
+    with col_metrics:
+        st.subheader("Légende")
+        for node_type, color in NODE_COLORS.items():
+            st.markdown(f"<span style='color:{color}; font-size:16px'>■</span> {node_type}",
+                        unsafe_allow_html=True)
 
-with col_metrics:
-    st.subheader("Légende")
-    for node_type, color in NODE_COLORS.items():
-        st.markdown(f"<span style='color:{color}; font-size:16px'>■</span> {node_type}",
-                    unsafe_allow_html=True)
+        st.divider()
 
-    st.divider()
+        if not events.empty and "action_type" in events.columns:
+            st.subheader("Actions (100 derniers événements)")
+            st.bar_chart(events["action_type"].value_counts())
 
-    if not events.empty and "action_type" in events.columns:
-        st.subheader("Actions (100 derniers événements)")
-        st.bar_chart(events["action_type"].value_counts())
+            st.subheader("Achats par catégorie")
+            purchases = events[events["action_type"] == "ACHAT"]
+            if not purchases.empty:
+                st.dataframe(
+                    purchases["product_cat"].value_counts().rename("achats"),
+                    use_container_width=True,
+                )
+        else:
+            st.info("Aucun événement reçu.")
 
-        st.subheader("Achats par catégorie")
-        purchases = events[events["action_type"] == "ACHAT"]
-        if not purchases.empty:
-            st.dataframe(
-                purchases["product_cat"].value_counts().rename("achats"),
-                use_container_width=True,
-            )
-    else:
-        st.info("Aucun événement reçu.")
+    st.caption(f"⟳ Rafraîchissement toutes les {int(REFRESH_S)} secondes")
+    time.sleep(REFRESH_S)
+    st.rerun()
 
-st.caption(f"⟳ Rafraîchissement toutes les {int(REFRESH_S)} secondes")
-time.sleep(REFRESH_S)
-st.rerun()
+
+if __name__ == "__main__":
+    main()
