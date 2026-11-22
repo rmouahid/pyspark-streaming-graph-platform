@@ -8,6 +8,7 @@ import random
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from faker import Faker
 
@@ -55,11 +56,14 @@ def write_event(event: dict, output_dir: str = DATA_PATH) -> str:
     # et le dashboard ignorent, puis renommé. Sans cela, Spark peut lire un fichier
     # à moitié écrit et produire une ligne entièrement nulle.
     name = f"event_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.json"
-    tmp_path = os.path.join(output_dir, f".{name}.tmp")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(event, f, ensure_ascii=False)
+    tmp_path = Path(output_dir) / f".{name}.tmp"
     path = os.path.join(output_dir, name)
-    os.replace(tmp_path, path)
+    try:
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(event, f, ensure_ascii=False)
+        os.replace(tmp_path, path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
     return path
 
 

@@ -90,9 +90,16 @@ def test_malformed_json_files_are_dropped(spark, tmp_path):
 
 
 def test_simulator_temporary_files_are_ignored(spark, tmp_path):
-    (tmp_path / ".event_1.json.tmp").write_text('{"timestamp": ')
+    from simulator.event_producer import write_event
 
-    assert run_stream_once(spark, tmp_path, "hidden_check") == []
+    (tmp_path / ".event_1.json.tmp").write_text(
+        json.dumps(event(user_id="usr_2000")), encoding="utf-8"
+    )
+    write_event(event(), str(tmp_path))
+
+    rows = run_stream_once(spark, tmp_path, "hidden_check")
+
+    assert [row["user_id"] for row in rows] == ["usr_1000"]
 
 
 def test_process_batch_writes_the_graph_and_skips_empty_batches(make_events, tmp_path, monkeypatch):
