@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 ###
-### Ce fichier a été fait par l'IA, il sert uniquement à lancer la plateforme complète (simulateur, pipeline Spark, dashboard) en une seule commande.
+### Lance la plateforme complète (simulateur, pipeline Spark, dashboard) en une seule commande.
 ###
 
-#!/usr/bin/env bash
 set -euo pipefail
 
 # ── Paths ────────────────────────────────────────────────────────────────────
@@ -10,6 +10,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$ROOT/.venv"
 LOGS="$ROOT/logs"
 PIDS=()
+
+# Les chemins de config/settings.py sont relatifs à la racine du projet.
+cd "$ROOT"
 
 # ── Colours ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'

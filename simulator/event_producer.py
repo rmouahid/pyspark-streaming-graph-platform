@@ -2,14 +2,19 @@
 # sous forme de fichiers JSON déposés dans data/events/ toutes les 500ms.
 
 import json
+import logging
 import os
 import random
 import time
+import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from faker import Faker
 
 from config.settings import DATA_PATH
+
+logger = logging.getLogger(__name__)
 
 fake = Faker("fr_FR")
 
@@ -34,7 +39,8 @@ def generate_event() -> dict:
     category = random.choice(CATEGORIES)
     low, high = PRICE_RANGES[category]
     return {
-        "timestamp":   datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f"),
+        # Décalage explicite (+00:00) : sans lui, Spark lirait l'heure dans le fuseau local.
+        "timestamp":   datetime.now(timezone.utc).isoformat(timespec="microseconds"),
         "user_id":     f"usr_{random.randint(1000, 9999)}",
         "user_city":   fake.city(),
         "product_id":  f"prod_{random.randint(1000, 9999)}",
@@ -45,16 +51,30 @@ def generate_event() -> dict:
     }
 
 
+def write_event(event: dict, output_dir: str = DATA_PATH) -> str:
+    # Écriture atomique : le JSON est d'abord écrit dans un fichier caché, que Spark
+    # et le dashboard ignorent, puis renommé. Sans cela, Spark peut lire un fichier
+    # à moitié écrit et produire une ligne entièrement nulle.
+    name = f"event_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.json"
+    tmp_path = Path(output_dir) / f".{name}.tmp"
+    path = os.path.join(output_dir, name)
+    try:
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(event, f, ensure_ascii=False)
+        os.replace(tmp_path, path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    return path
+
+
 def run(output_dir: str = DATA_PATH, delay: float = 0.5) -> None:
     os.makedirs(output_dir, exist_ok=True)
-    print(f"Simulateur démarré → {output_dir}  (délai {delay}s)")
+    logger.info("Simulateur démarré → %s (délai %ss)", output_dir, delay)
     while True:
-        event = generate_event()
-        filename = os.path.join(output_dir, f"event_{int(time.time() * 1000)}.json")
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(event, f, ensure_ascii=False)
+        write_event(generate_event(), output_dir)
         time.sleep(delay)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     run()

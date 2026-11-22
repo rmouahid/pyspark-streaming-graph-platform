@@ -4,6 +4,7 @@
 
 import csv
 import os
+from tempfile import NamedTemporaryFile
 
 from graphframes import GraphFrame
 from pyspark.sql import DataFrame
@@ -61,11 +62,24 @@ def _write_csv(df: DataFrame, path: str) -> None:
     # df.write.csv() produit un répertoire de part-files ; on utilise collect()
     # pour écrire un fichier unique directement lisible par le dashboard.
     rows = df.collect()
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=df.columns)
-        writer.writeheader()
-        writer.writerows([row.asDict() for row in rows])
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    with NamedTemporaryFile(mode="w", dir=directory, newline="", encoding="utf-8",
+                            delete=False) as tmp:
+        tmp_name = tmp.name
+        try:
+            writer = csv.DictWriter(tmp, fieldnames=df.columns)
+            writer.writeheader()
+            writer.writerows(row.asDict() for row in rows)
+        except BaseException:
+            tmp.close()
+            os.unlink(tmp_name)
+            raise
+    try:
+        os.replace(tmp_name, path)
+    finally:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
 
 
 def compute_metrics(graph: GraphFrame) -> None:
