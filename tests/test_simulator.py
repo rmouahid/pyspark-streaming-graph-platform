@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -77,3 +78,28 @@ def test_write_event_leaves_only_complete_json_files(tmp_path):
         assert name.endswith(".json") and not name.startswith((".", "_"))
         with open(tmp_path / name, encoding="utf-8") as f:
             json.load(f)
+
+
+def test_write_event_publishes_only_after_serialization(tmp_path, monkeypatch):
+    event = generate_event()
+    replace = os.replace
+
+    def check_and_replace(source, destination):
+        source = Path(source)
+        assert list(tmp_path.iterdir()) == [source]
+        assert source.name.startswith(".") and source.suffix == ".tmp"
+        assert json.loads(source.read_text(encoding="utf-8")) == event
+        replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", check_and_replace)
+
+    published = Path(write_event(event, str(tmp_path)))
+    assert list(tmp_path.iterdir()) == [published]
+    assert json.loads(published.read_text(encoding="utf-8")) == event
+
+
+def test_write_event_removes_temporary_file_on_serialization_error(tmp_path):
+    with pytest.raises(TypeError):
+        write_event({"user_id": "usr_1000", "price": object()}, str(tmp_path))
+
+    assert list(tmp_path.iterdir()) == []
